@@ -59,7 +59,7 @@
       "name": "flixel-animate",
       "type": "git",
       "dir": null,
-      "ref": "220463c8089444d6c9957b68919fe88e6cba495f",
+      "ref": "84cd1915161eb49fba33b3f81a8c7ea3f05ae053",
       "url": "https://github.com/MaybeMaru/flixel-animate"
     },
     {
@@ -111,7 +111,7 @@
       "name": "hxcpp",
       "type": "git",
       "dir": null,
-      "ref": "6546fa5c3ad1bac065f144745122ab5a6d4195ff",
+      "ref": "5932340d095a7eea8635fe4d1355f1c0efd0b3c2",
       "url": "https://github.com/FunkinCrew/hxcpp"
     },
     {
@@ -146,7 +146,7 @@
     {
       "name": "hxvlc",
       "type": "haxelib",
-      "version": "2.2.4"
+      "version": "2.2.5"
     },
     {
       "name": "json2object",
@@ -173,7 +173,7 @@
       "name": "lime",
       "type": "git",
       "dir": null,
-      "ref": "27092822abf7b8c2ec2905053cf5435be4de838e",
+      "ref": "318253ea3a28a3299a167748912c40444f403777",
       "url": "https://github.com/FunkinCrew/lime"
     },
     {

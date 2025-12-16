@@ -67,7 +67,7 @@ class Save implements ConsoleClass
   @:nullSafety(Off)
   public function new(?data:RawSaveData)
   {
-    this.data = data ?? Save.getDefaultData();
+    this.data = data ??= Save.getDefaultData();
     // Build macro will inject SaveProperty initialization here automatically
 
     // Make sure the verison number is up to date before we flush.
@@ -170,6 +170,7 @@ class Save implements ConsoleClass
           chartEditorLiveInputStyle: ChartEditorLiveInputStyle.None,
           theme: ChartEditorTheme.Light,
           playtestStartTime: false,
+          playtestAudioSettings: false,
           downscroll: false,
           showNoteKinds: true,
           metronomeVolume: 1.0,
@@ -280,6 +281,9 @@ class Save implements ConsoleClass
 
   @:saveProperty(data.optionsChartEditor.playtestStartTime, false)
   public var chartEditorPlaytestStartTime:SaveProperty<Bool>;
+
+  @:saveProperty(data.optionsChartEditor.playtestAudioSettings, false)
+  public var chartEditorPlaytestAudioSettings:SaveProperty<Bool>;
 
   @:saveProperty(data.optionsChartEditor.theme, ChartEditorTheme.Light)
   public var chartEditorTheme:SaveProperty<ChartEditorTheme>;
@@ -1427,6 +1431,12 @@ typedef SaveDataChartEditorOptions =
    * @default `false`
    */
   var ?playtestStartTime:Bool;
+
+  /**
+   * If true, playtest songs with the current audio settings in the Chart Editor.
+   * @default `false`
+   */
+  var ?playtestAudioSettings:Bool;
 
   /**
    * Theme music in the Chart Editor.

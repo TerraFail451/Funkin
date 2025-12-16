@@ -5,7 +5,6 @@ import funkin.util.assets.FlxAnimationUtil;
 import funkin.modding.events.ScriptEvent;
 import funkin.data.animation.AnimationData;
 import funkin.data.character.CharacterData.CharacterRenderType;
-import flixel.math.FlxPoint;
 
 /**
  * An AnimateAtlasCharacter is a Character which is rendered by
@@ -16,8 +15,6 @@ import flixel.math.FlxPoint;
  */
 class AnimateAtlasCharacter extends BaseCharacter
 {
-  var originalSizes(default, never):FlxPoint = new FlxPoint(0, 0);
-
   public function new(id:String)
   {
     super(id, CharacterRenderType.AnimateAtlas);
@@ -43,17 +40,15 @@ class AnimateAtlasCharacter extends BaseCharacter
 
     trace('[ATLASCHAR] Successfully loaded texture atlas for ${characterId} with ${_data.animations.length} animations.');
     super.onCreate(event);
-
-    originalSizes.set(this.width, this.height);
   }
 
-  function loadAtlas()
+  function loadAtlas():Void
   {
     trace('[ATLASCHAR] Loading sprite atlas for ${characterId}.');
     var assetLibrary:String = Paths.getLibrary(_data.assetPath);
     var assetPath:String = Paths.stripLibrary(_data.assetPath);
 
-    loadTextureAtlas(assetPath, assetLibrary, cast _data.atlasSettings);
+    loadTextureAtlas(assetPath, assetLibrary, getAtlasSettings());
 
     if (_data.isPixel)
     {
@@ -69,7 +64,7 @@ class AnimateAtlasCharacter extends BaseCharacter
     this.setScale(_data.scale);
   }
 
-  function loadAnimations()
+  function loadAnimations():Void
   {
     trace('[ATLASCHAR] Loading ${_data.animations.length} animations for ${characterId}');
 
@@ -91,13 +86,12 @@ class AnimateAtlasCharacter extends BaseCharacter
     trace('[ATLASCHAR] Successfully loaded ${animNames.length} animations for ${characterId}');
   }
 
-  override function get_width():Float
+  /**
+   * Get the configuration for the texture atlas.
+   * @return The configuration for the texture atlas.
+   */
+  public function getAtlasSettings():AtlasSpriteSettings
   {
-    return originalSizes.x;
-  }
-
-  override function get_height():Float
-  {
-    return originalSizes.y;
+    return cast _data.atlasSettings;
   }
 }

@@ -21,6 +21,7 @@ import animate.internal.elements.AtlasInstance;
 import animate.internal.elements.SymbolInstance;
 import animate.FlxAnimate;
 import animate.FlxAnimateFrames;
+import haxe.io.Path;
 
 using StringTools;
 
@@ -91,6 +92,17 @@ typedef AtlasSpriteSettings =
    */
   @:optional
   var applyStageMatrix:Bool;
+
+  /**
+   * If enabled, the sprite will render as one texture instead of rendering multiple limbs.
+   * This is useful for stuff like changing alpha, and shaders that require the whole sprite.
+   *
+   * Only enable this if your sprite either:
+   * - Changes alpha to something other than 1.0
+   * - Has a shader or blend mode
+   */
+  @:optional
+  var useRenderTexture:Bool;
 }
 
 /**
@@ -104,10 +116,41 @@ class FunkinSprite extends FlxAnimate
   /**
    * @param x Starting X position
    * @param y Starting Y position
+   * @param path The asset path for the graphic
+   * @param atlasSettings The optional settings for the texture atlas
    */
-  public function new(?x:Float = 0, ?y:Float = 0)
+  public function new(?x:Float = 0, ?y:Float = 0, ?path:String, ?atlasSettings:AtlasSpriteSettings)
   {
     super(x, y);
+
+    if (path != null)
+    {
+      var ext:String = Path.extension(path);
+
+      switch (ext)
+      {
+        case 'png':
+          this.loadGraphic(path);
+
+        case '':
+          // Do the opposite of Paths.animateAtlas since that function is called in loadTextureAtlas.
+          var lib:String = Paths.getLibrary(path);
+
+          if (lib == 'preload')
+          {
+            path = path.replace('assets/images/', '');
+          }
+          else
+          {
+            path = path.replace('$lib:assets/$lib/images/', '');
+          }
+
+          this.loadTextureAtlas(path, lib, atlasSettings);
+
+        default:
+          FlxG.log.warn('Texture path $path is not a valid path. Make sure the path points to either an image or a folder with the texture atlas files!');
+      }
+    }
   }
 
   override function initVars():Void
@@ -297,7 +340,8 @@ class FunkinSprite extends FlxAnimate
         cacheKey: settings?.cacheKey ?? null,
         uniqueInCache: settings?.uniqueInCache ?? false,
         onSymbolCreate: settings?.onSymbolCreate ?? null,
-        applyStageMatrix: settings?.applyStageMatrix ?? false
+        applyStageMatrix: settings?.applyStageMatrix ?? false,
+        useRenderTexture: settings?.useRenderTexture ?? false
       };
 
     var assetLibrary:String = assetLibrary ?? "";
@@ -319,6 +363,7 @@ class FunkinSprite extends FlxAnimate
     }
 
     this.applyStageMatrix = validatedSettings.applyStageMatrix ?? false;
+    this.useRenderTexture = validatedSettings.useRenderTexture ?? false;
 
     frames = FlxAnimateFrames.fromAnimate(graphicKey, validatedSettings.spritemaps, validatedSettings.metadataJson, validatedSettings.cacheKey,
       validatedSettings.uniqueInCache, {
@@ -417,6 +462,46 @@ class FunkinSprite extends FlxAnimate
     }
 
     return false;
+  }
+
+  /**
+   * Gets every frame on every symbol that starts with the given keyword.
+   * @param keyword The keyword to search for.
+   * @return An array of frames.
+   */
+  public function getFramesWithKeyword(keyword:String):Array<animate.internal.Frame>
+  {
+    if (!this.isAnimate)
+    {
+      trace('WARNING: getFramesWithKeyword() only works texture atlases!');
+      return [];
+    }
+
+    var symbolItems:Array<animate.internal.SymbolItem> = [];
+    var frames:Array<animate.internal.Frame> = [];
+
+    @:privateAccess
+    for (symbol in this.library.dictionary.keys())
+    {
+      var symbolItem:Null<animate.internal.SymbolItem> = this.library.getSymbol(symbol);
+      if (symbolItem == null) continue;
+
+      if (symbolItem.name.contains(keyword))
+      {
+        symbolItems.push(symbolItem);
+      }
+    }
+
+    for (symbolItem in symbolItems)
+    {
+      symbolItem.timeline.forEachLayer((layer) -> {
+        layer.forEachFrame((frame) -> {
+          frames.push(frame);
+        });
+      });
+    }
+
+    return frames;
   }
 
   /**

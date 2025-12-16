@@ -122,6 +122,11 @@ typedef PlayStateParams =
    */
   ?botPlayMode:Bool,
   /**
+   * Whether the results screen should show up before returning to the chart editor.
+   * @default `false`
+   */
+  ?playtestResults:Bool,
+  /**
    * Whether the song should be in minimal mode.
    * @default `false`
    */
@@ -245,6 +250,24 @@ class PlayState extends MusicBeatSubState
   public var playbackRate:Float = 1.0;
 
   /**
+   * The volume of the instrumental track.
+   * @default `1.0` for 100%.
+   */
+  public var instrumentalVolume:Float = 1.0;
+
+  /**
+   * The volume of the player vocals track.
+   * @default `1.0` for 100%.
+   */
+  public var playerVocalsVolume:Float = 1.0;
+
+  /**
+   * The volume of the opponent vocals track.
+   * @default `1.0` for 100%.
+   */
+  public var opponentVocalsVolume:Float = 1.0;
+
+  /**
    * An empty FlxObject contained in the scene.
    * The current gameplay camera will always follow this object. Tween its position to move the camera smoothly.
    *
@@ -361,6 +384,11 @@ class PlayState extends MusicBeatSubState
    * If true, player will not gain or lose score from notes.
    */
   public var isBotPlayMode:Bool = false;
+
+  /**
+   * Whether the results screen should show up before returning to the chart editor.
+   */
+  public var isPlaytestResults:Bool = false;
 
   /**
    * Whether the player has dropped below zero health,
@@ -723,6 +751,7 @@ class PlayState extends MusicBeatSubState
     if (params.targetInstrumental != null) currentInstrumental = params.targetInstrumental;
     isPracticeMode = params.practiceMode ?? false;
     isBotPlayMode = params.botPlayMode ?? false;
+    isPlaytestResults = params.playtestResults ?? false;
     isMinimalMode = params.minimalMode ?? false;
     startTimestamp = params.startTimestamp ?? 0.0;
     playbackRate = params.playbackRate ?? 1.0;
@@ -811,6 +840,10 @@ class PlayState extends MusicBeatSubState
     // This state receives draw calls even when a substate is active.
     this.persistentDraw = true;
 
+    // Make the player unable to pause if they're moving from the chart editor while the focus is still on since the input persists.
+    @:privateAccess
+    justUnpaused = isChartingMode && !FlxG.game._lostFocus;
+
     // Stop any pre-existing music.
     if (!overrideMusic)
     {
@@ -833,6 +866,7 @@ class PlayState extends MusicBeatSubState
     var pre:Float = (Conductor.instance.beatLengthMs * -5) + startTimestamp;
 
     trace('Attempting to start at ' + pre);
+    trace('startTimestamp ${startTimestamp}');
 
     Conductor.instance.update(pre);
 
@@ -1045,16 +1079,15 @@ class PlayState extends MusicBeatSubState
         }
       }
 
-      if (FlxG.sound.music != null) FlxG.sound.music.volume = 1;
+      if (FlxG.sound.music != null) FlxG.sound.music.volume = instrumentalVolume;
 
       if (vocals != null)
       {
         vocals.pause();
         vocals.time = startTimestamp - Conductor.instance.instrumentalOffset;
 
-        vocals.volume = 1;
-        vocals.playerVolume = 1;
-        vocals.opponentVolume = 1;
+        vocals.playerVolume = playerVocalsVolume;
+        vocals.opponentVolume = opponentVocalsVolume;
       }
 
       if (!fromDeathState)
@@ -1067,7 +1100,7 @@ class PlayState extends MusicBeatSubState
       opponentStrumline.clean();
 
       // Delete all notes and reset the arrays.
-      regenNoteData();
+      regenNoteData(startTimestamp);
 
       // Reset camera zooming
       cameraBopIntensity = Constants.DEFAULT_BOP_INTENSITY;
@@ -1185,14 +1218,17 @@ class PlayState extends MusicBeatSubState
     if (health > Constants.HEALTH_MAX) health = Constants.HEALTH_MAX;
     if (health < Constants.HEALTH_MIN) health = Constants.HEALTH_MIN;
 
-    // Apply camera zoom + multipliers.
-    if (subState == null && cameraZoomRate > 0.0) // && !isInCutscene)
-    {
-      cameraBopMultiplier = FlxMath.lerp(1.0, cameraBopMultiplier, 0.95); // Lerp bop multiplier back to 1.0x
-      var zoomPlusBop = currentCameraZoom * cameraBopMultiplier; // Apply camera bop multiplier.
-      if (!debugUnbindCameraZoom) FlxG.camera.zoom = zoomPlusBop; // Actually apply the zoom to the camera.
+    var decayRate:Float = 0.95;
+    var dt:Float = elapsed * 60; //
 
-      camHUD.zoom = FlxMath.lerp(defaultHUDCameraZoom, camHUD.zoom, 0.95);
+    if (subState == null && cameraZoomRate > 0.0)
+    {
+      cameraBopMultiplier = FlxMath.lerp(1.0, cameraBopMultiplier, Math.pow(decayRate, dt));
+
+      var zoomPlusBop = currentCameraZoom * cameraBopMultiplier;
+      if (!debugUnbindCameraZoom) FlxG.camera.zoom = zoomPlusBop;
+
+      camHUD.zoom = FlxMath.lerp(defaultHUDCameraZoom, camHUD.zoom, Math.pow(decayRate, dt));
     }
 
     if (currentStage != null && currentStage.getBoyfriend() != null)
@@ -2381,7 +2417,7 @@ class PlayState extends MusicBeatSubState
       }
     }
 
-    regenNoteData();
+    regenNoteData(startTimestamp);
 
     var event:ScriptEvent = new ScriptEvent(CREATE, false);
     ScriptEventDispatcher.callEvent(currentSong, event);
@@ -2557,7 +2593,7 @@ class PlayState extends MusicBeatSubState
     }
 
     // Prevent the volume from being wrong.
-    FlxG.sound.music.volume = 1.0;
+    FlxG.sound.music.volume = instrumentalVolume;
     if (FlxG.sound.music.fadeTween != null) FlxG.sound.music.fadeTween.cancel();
 
     if (vocals != null)
@@ -2567,7 +2603,8 @@ class PlayState extends MusicBeatSubState
 
       vocals.time = startTimestamp - Conductor.instance.instrumentalOffset;
       vocals.pitch = playbackRate;
-      vocals.volume = 1.0;
+      vocals.playerVolume = playerVocalsVolume;
+      vocals.opponentVolume = opponentVocalsVolume;
 
       // trace('STARTING SONG AT:');
       // trace('${FlxG.sound.music.time}');
@@ -2679,8 +2716,6 @@ class PlayState extends MusicBeatSubState
      */
   function onKeyRelease(event:PreciseInputEvent):Void
   {
-    if (isGamePaused) return;
-
     // Do the minimal possible work here.
     inputReleaseQueue.push(event);
   }
@@ -3034,7 +3069,7 @@ class PlayState extends MusicBeatSubState
     playerStrumline.hitNote(note, !event.isComboBreak);
     if (event.doesNotesplash) playerStrumline.playNoteSplash(note.noteData.getDirection());
     if (note.isHoldNote && note.holdNoteSprite != null) playerStrumline.playNoteHoldCover(note.holdNoteSprite);
-    if (vocals != null) vocals.playerVolume = 1;
+    if (vocals != null) vocals.playerVolume = playerVocalsVolume;
 
     // Display the combo meter and add the calculation to the score.
     if (note.scoreable)
@@ -3284,7 +3319,7 @@ class PlayState extends MusicBeatSubState
     comboPopUps.displayRating(daRating);
     if (combo >= 10) comboPopUps.displayCombo(combo);
 
-    if (vocals != null) vocals.playerVolume = 1;
+    if (vocals != null) vocals.playerVolume = playerVocalsVolume;
   }
 
   /**
@@ -3593,7 +3628,21 @@ class PlayState extends MusicBeatSubState
     {
       if (isSubState)
       {
-        this.close();
+        if (isPlaytestResults)
+        {
+          var talliesToUse:Tallies = PlayStatePlaylist.isStoryMode ? Highscore.talliesLevel : Highscore.tallies;
+          var clearPercentFloat = talliesToUse.totalNotes == 0 ? 0.0 : (talliesToUse.sick + talliesToUse.good) / talliesToUse.totalNotes * 100;
+          /*
+              Only move to the score screen if more than 30% of the song was successfully hit.
+              While that might sound like a low clear percent, consider the fact that some songs are hard,
+              and the user might be only playtesting one third or half the song.
+             */
+          if (clearPercentFloat >= 30) moveToResultsScreen(false, prevScoreData);
+          else
+            this.close();
+        }
+        else
+          this.close();
       }
       else
       {
